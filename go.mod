@@ -3,7 +3,7 @@ module github.com/Admiral-Piett/goaws
 go 1.18
 
 require (
-	github.com/aws/aws-sdk-go v1.47.3
+	github.com/aws/aws-sdk-go v1.48.7
 	github.com/ghodss/yaml v1.0.0
 	github.com/gorilla/mux v1.8.0
 	github.com/sirupsen/logrus v1.9.0
@@ -22,7 +22,7 @@ require (
 )
 
 retract (
-        v1.1.0
-        v1.1.1
-        v1.1.2
+	v1.1.2
+	v1.1.1
+	v1.1.0
 )

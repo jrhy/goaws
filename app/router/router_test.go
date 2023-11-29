@@ -4,9 +4,33 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 )
 
+func TestGetQueueUrl_JSON_Request(t *testing.T) {
+	// Create a request to pass to our handler. We don't have any query parameters for now, so we'll
+	// pass 'nil' as the third parameter.
+	req, err := http.NewRequest("POST", "/", strings.NewReader(`{"QueueName":"myqueue"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Add("Content-Type", "application/x-amz-json-1.0")
+	req.Header.Add("X-Amz-Target", "AmazonSQS.GetQueueUrl")
+
+	// We create a ResponseRecorder (which satisfies http.ResponseWriter) to record the response.
+	rr := httptest.NewRecorder()
+
+	// Our handlers satisfy http.Handler, so we can call their ServeHTTP method
+	// directly and pass in our Request and ResponseRecorder.
+	New().ServeHTTP(rr, req)
+
+	// Check the status code is what we expect.
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+}
 func TestIndexServerhandler_POST_BadRequest(t *testing.T) {
 	// Create a request to pass to our handler. We don't have any query parameters for now, so we'll
 	// pass 'nil' as the third parameter.

@@ -1,8 +1,11 @@
 package router
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -65,6 +68,23 @@ func health(w http.ResponseWriter, req *http.Request) {
 }
 
 func actionHandler(w http.ResponseWriter, req *http.Request) {
+	if req.Header.Get("Content-Type") == "application/x-amz-json-1.0" {
+		m := map[string]string{}
+		err := json.NewDecoder(req.Body).Decode(&m)
+		if err != nil {
+			log.Println("Bad Request - ", err)
+			w.WriteHeader(http.StatusBadRequest)
+			io.WriteString(w, "Bad Request")
+			return
+		}
+		req.Form = url.Values{}
+		for k, v := range m {
+			req.Form.Add(k, v)
+		}
+		req.Form.Add("Action",
+			strings.TrimPrefix(req.Header.Get("X-Amz-Target"),
+				"AmazonSQS."))
+	}
 	log.WithFields(
 		log.Fields{
 			"action": req.FormValue("Action"),

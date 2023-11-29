@@ -1,7 +1,6 @@
 package gosqs
 
 import (
-	"encoding/xml"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -12,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/Admiral-Piett/goaws/app"
+	"github.com/Admiral-Piett/goaws/app/awsresponse"
 	"github.com/Admiral-Piett/goaws/app/common"
 	"github.com/gorilla/mux"
 )
@@ -92,7 +92,6 @@ func PeriodicTasks(d time.Duration, quit <-chan struct{}) {
 }
 
 func ListQueues(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/xml")
 	respStruct := app.ListQueuesResponse{}
 	respStruct.Xmlns = "http://queue.amazonaws.com/doc/2012-11-05/"
 	respStruct.Metadata = app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000000"}
@@ -107,15 +106,13 @@ func ListQueues(w http.ResponseWriter, req *http.Request) {
 		}
 		app.SyncQueues.Unlock()
 	}
-	enc := xml.NewEncoder(w)
-	enc.Indent("  ", "    ")
+	enc := awsresponse.NewEncoder(req, w)
 	if err := enc.Encode(respStruct); err != nil {
 		log.Printf("error: %v\n", err)
 	}
 }
 
 func CreateQueue(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/xml")
 	queueName := req.FormValue("QueueName")
 
 	queueUrl := "http://" + app.CurrentEnvironment.Host + ":" + app.CurrentEnvironment.Port +
@@ -149,15 +146,13 @@ func CreateQueue(w http.ResponseWriter, req *http.Request) {
 	}
 
 	respStruct := app.CreateQueueResponse{"http://queue.amazonaws.com/doc/2012-11-05/", app.CreateQueueResult{QueueUrl: queueUrl}, app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000000"}}
-	enc := xml.NewEncoder(w)
-	enc.Indent("  ", "    ")
+	enc := awsresponse.NewEncoder(req, w)
 	if err := enc.Encode(respStruct); err != nil {
 		log.Printf("error: %v\n", err)
 	}
 }
 
 func SendMessage(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/xml")
 	req.ParseForm()
 	messageBody := req.FormValue("MessageBody")
 	messageGroupID := req.FormValue("MessageGroupId")
@@ -235,8 +230,7 @@ func SendMessage(w http.ResponseWriter, req *http.Request) {
 		},
 	}
 
-	enc := xml.NewEncoder(w)
-	enc.Indent("  ", "    ")
+	enc := awsresponse.NewEncoder(req, w)
 	if err := enc.Encode(respStruct); err != nil {
 		log.Printf("error: %v\n", err)
 	}
@@ -251,7 +245,6 @@ type SendEntry struct {
 }
 
 func SendMessageBatch(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/xml")
 	req.ParseForm()
 
 	queueUrl := getQueueFromPath(req.FormValue("QueueUrl"), req.URL.String())
@@ -370,15 +363,13 @@ func SendMessageBatch(w http.ResponseWriter, req *http.Request) {
 		app.SendMessageBatchResult{Entry: sentEntries},
 		app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000001"}}
 
-	enc := xml.NewEncoder(w)
-	enc.Indent(" ", "    ")
+	enc := awsresponse.NewEncoder(req, w)
 	if err := enc.Encode(respStruct); err != nil {
 		log.Printf("error: %v\n", err)
 	}
 }
 
 func ReceiveMessage(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/xml")
 	req.ParseForm()
 
 	waitTimeSeconds := 0
@@ -498,8 +489,7 @@ func ReceiveMessage(w http.ResponseWriter, req *http.Request) {
 		respStruct = app.ReceiveMessageResponse{Xmlns: "http://queue.amazonaws.com/doc/2012-11-05/", Result: app.ReceiveMessageResult{}, Metadata: app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000000"}}
 	}
 	app.SyncQueues.Unlock() // Unlock the Queues
-	enc := xml.NewEncoder(w)
-	enc.Indent("  ", "    ")
+	enc := awsresponse.NewEncoder(req, w)
 	if err := enc.Encode(respStruct); err != nil {
 		log.Printf("error: %v\n", err)
 	}
@@ -516,7 +506,6 @@ func numberOfHiddenMessagesInQueue(queue app.Queue) int {
 }
 
 func ChangeMessageVisibility(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/xml")
 	vars := mux.Vars(req)
 
 	queueUrl := getQueueFromPath(req.FormValue("QueueUrl"), req.URL.String())
@@ -579,8 +568,7 @@ func ChangeMessageVisibility(w http.ResponseWriter, req *http.Request) {
 		"http://queue.amazonaws.com/doc/2012-11-05/",
 		app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000001"}}
 
-	enc := xml.NewEncoder(w)
-	enc.Indent(" ", "    ")
+	enc := awsresponse.NewEncoder(req, w)
 	if err := enc.Encode(respStruct); err != nil {
 		log.Printf("error: %v\n", err)
 		createErrorResponse(w, req, "GeneralError")
@@ -596,7 +584,6 @@ type DeleteEntry struct {
 }
 
 func DeleteMessageBatch(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/xml")
 	req.ParseForm()
 
 	queueUrl := getQueueFromPath(req.FormValue("QueueUrl"), req.URL.String())
@@ -675,17 +662,13 @@ func DeleteMessageBatch(w http.ResponseWriter, req *http.Request) {
 		app.DeleteMessageBatchResult{Entry: deletedEntries, Error: notFoundEntries},
 		app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000001"}}
 
-	enc := xml.NewEncoder(w)
-	enc.Indent(" ", "    ")
+	enc := awsresponse.NewEncoder(req, w)
 	if err := enc.Encode(respStruct); err != nil {
 		log.Printf("error: %v\n", err)
 	}
 }
 
 func DeleteMessage(w http.ResponseWriter, req *http.Request) {
-	// Sent response type
-	w.Header().Set("Content-Type", "application/xml")
-
 	// Retrieve FormValues required
 	receiptHandle := req.FormValue("ReceiptHandle")
 
@@ -717,8 +700,7 @@ func DeleteMessage(w http.ResponseWriter, req *http.Request) {
 				app.SyncQueues.Unlock()
 				// Create, encode/xml and send response
 				respStruct := app.DeleteMessageResponse{"http://queue.amazonaws.com/doc/2012-11-05/", app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000001"}}
-				enc := xml.NewEncoder(w)
-				enc.Indent("  ", "    ")
+				enc := awsresponse.NewEncoder(req, w)
 				if err := enc.Encode(respStruct); err != nil {
 					log.Printf("error: %v\n", err)
 				}
@@ -735,9 +717,6 @@ func DeleteMessage(w http.ResponseWriter, req *http.Request) {
 }
 
 func DeleteQueue(w http.ResponseWriter, req *http.Request) {
-	// Sent response type
-	w.Header().Set("Content-Type", "application/xml")
-
 	// Retrieve FormValues required
 	queueUrl := getQueueFromPath(req.FormValue("QueueUrl"), req.URL.String())
 	queueName := ""
@@ -756,17 +735,13 @@ func DeleteQueue(w http.ResponseWriter, req *http.Request) {
 
 	// Create, encode/xml and send response
 	respStruct := app.DeleteQueueResponse{"http://queue.amazonaws.com/doc/2012-11-05/", app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000000"}}
-	enc := xml.NewEncoder(w)
-	enc.Indent("  ", "    ")
+	enc := awsresponse.NewEncoder(req, w)
 	if err := enc.Encode(respStruct); err != nil {
 		log.Printf("error: %v\n", err)
 	}
 }
 
 func PurgeQueue(w http.ResponseWriter, req *http.Request) {
-	// Sent response type
-	w.Header().Set("Content-Type", "application/xml")
-
 	// Retrieve FormValues required
 	queueUrl := getQueueFromPath(req.FormValue("QueueUrl"), req.URL.String())
 
@@ -780,8 +755,7 @@ func PurgeQueue(w http.ResponseWriter, req *http.Request) {
 		app.SyncQueues.Queues[queueName].Messages = nil
 		app.SyncQueues.Queues[queueName].Duplicates = make(map[string]time.Time)
 		respStruct := app.PurgeQueueResponse{"http://queue.amazonaws.com/doc/2012-11-05/", app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000000"}}
-		enc := xml.NewEncoder(w)
-		enc.Indent("  ", "    ")
+		enc := awsresponse.NewEncoder(req, w)
 		if err := enc.Encode(respStruct); err != nil {
 			log.Printf("error: %v\n", err)
 			createErrorResponse(w, req, "GeneralError")
@@ -794,9 +768,6 @@ func PurgeQueue(w http.ResponseWriter, req *http.Request) {
 }
 
 func GetQueueUrl(w http.ResponseWriter, req *http.Request) {
-	// Sent response type
-	w.Header().Set("Content-Type", "application/xml")
-	//
 	//// Retrieve FormValues required
 	queueName := req.FormValue("QueueName")
 	if queue, ok := app.SyncQueues.Queues[queueName]; ok {
@@ -805,8 +776,7 @@ func GetQueueUrl(w http.ResponseWriter, req *http.Request) {
 		// Create, encode/xml and send response
 		result := app.GetQueueUrlResult{QueueUrl: url}
 		respStruct := app.GetQueueUrlResponse{"http://queue.amazonaws.com/doc/2012-11-05/", result, app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000000"}}
-		enc := xml.NewEncoder(w)
-		enc.Indent("  ", "    ")
+		enc := awsresponse.NewEncoder(req, w)
 		if err := enc.Encode(respStruct); err != nil {
 			log.Printf("error: %v\n", err)
 		}
@@ -817,8 +787,6 @@ func GetQueueUrl(w http.ResponseWriter, req *http.Request) {
 }
 
 func GetQueueAttributes(w http.ResponseWriter, req *http.Request) {
-	// Sent response type
-	w.Header().Set("Content-Type", "application/xml")
 	// Retrieve FormValues required
 	queueUrl := getQueueFromPath(req.FormValue("QueueUrl"), req.URL.String())
 
@@ -901,8 +869,7 @@ func GetQueueAttributes(w http.ResponseWriter, req *http.Request) {
 
 		result := app.GetQueueAttributesResult{Attrs: attribs}
 		respStruct := app.GetQueueAttributesResponse{"http://queue.amazonaws.com/doc/2012-11-05/", result, app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000000"}}
-		enc := xml.NewEncoder(w)
-		enc.Indent("  ", "    ")
+		enc := awsresponse.NewEncoder(req, w)
 		if err := enc.Encode(respStruct); err != nil {
 			log.Printf("error: %v\n", err)
 		}
@@ -914,9 +881,6 @@ func GetQueueAttributes(w http.ResponseWriter, req *http.Request) {
 }
 
 func SetQueueAttributes(w http.ResponseWriter, req *http.Request) {
-	// Sent response type
-	w.Header().Set("Content-Type", "application/xml")
-
 	queueUrl := getQueueFromPath(req.FormValue("QueueUrl"), req.URL.String())
 
 	queueName := ""
@@ -938,8 +902,7 @@ func SetQueueAttributes(w http.ResponseWriter, req *http.Request) {
 		}
 
 		respStruct := app.SetQueueAttributesResponse{"http://queue.amazonaws.com/doc/2012-11-05/", app.ResponseMetadata{RequestId: "00000000-0000-0000-0000-000000000000"}}
-		enc := xml.NewEncoder(w)
-		enc.Indent("  ", "    ")
+		enc := awsresponse.NewEncoder(req, w)
 		if err := enc.Encode(respStruct); err != nil {
 			log.Printf("error: %v\n", err)
 		}
@@ -1001,8 +964,7 @@ func createErrorResponse(w http.ResponseWriter, req *http.Request, err string) {
 	}
 
 	w.WriteHeader(er.HttpError)
-	enc := xml.NewEncoder(w)
-	enc.Indent("  ", "    ")
+	enc := awsresponse.NewEncoder(req, w)
 	if err := enc.Encode(respStruct); err != nil {
 		log.Printf("error: %v\n", err)
 	}
